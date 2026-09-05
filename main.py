@@ -2,94 +2,116 @@ import io
 import math
 import requests
 from PIL import Image
+import datetime
+import time
+import os
+import scratchattach as scratch
 
-# ターゲット情報（総画素数を2倍の4900に設定）
-URL = "https://www.data.jma.go.jp/mscweb/data/himawari/img/jpn/jpn_trm_0020.jpg"
-TARGET_TOTAL_PIXELS = 9800
+# --- 設定項目 ---
+TARGET_TOTAL_PIXELS = 2400  # 👈 2400pxに修正（横56×縦42＝2352pxになります）
+SCRATCH_PROJECT_ID = "あなたのプロジェクトID（数字）"
 
 # 指定された10色のパレット（1番目 〜 10番目）
 COLOR_PALETTE = [
-    "#0A1128",  # 1番目
-    "#102542",  # 2番目
-    "#1E3A5F",  # 3番目
-    "#FFFFFF",  # 4番目
-    "#E2E8F0",  # 5番目
-    "#CBD5E1",  # 6番目
-    "#2D4A22",  # 7番目
-    "#4D7C0F",  # 8番目
-    "#78350F",  # 9番目
-    "#A16207"   # 10番目
+    "#0A1128", "#102542", "#1E3A5F", "#FFFFFF", "#E2E8F0",
+    "#CBD5E1", "#2D4A22", "#4D7C0F", "#78350F", "#A16207"
 ]
 
 def hex_to_rgb(hex_str):
-    """カラーコード（#RRGGBB）をRGBの数値（0-255）に変換する関数"""
     hex_str = hex_str.lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
-# 事前にパレットの色をRGB数値に変換しておく
 PALETTE_RGB = [hex_to_rgb(c) for c in COLOR_PALETTE]
 
 def find_closest_color_index(target_rgb):
-    """一番近い色の「番目（1〜10）」を返す関数"""
     tr, tg, tb = target_rgb
     min_distance = float('inf')
     closest_index = 1
-    
-    # 10色すべてと距離を比べて、一番近いものを探す
     for idx, (pr, pg, pb) in enumerate(PALETTE_RGB):
-        # 3次元空間の色距離（ユークリッド距離）の計算
         distance = math.sqrt((tr - pr)**2 + (tg - pg)**2 + (tb - pb)**2)
         if distance < min_distance:
             min_distance = distance
-            closest_index = idx
-            
+            closest_index = idx + 1
     return closest_index
 
+def download_latest_image():
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    rounded_minute = (now_utc.minute // 10) * 10
+    base_time = now_utc.replace(minute=rounded_minute, second=0, microsecond=0)
+    target_time = base_time - datetime.timedelta(minutes=10)
+
+    for _ in range(12):
+        time_str = target_time.strftime('%H%M')
+        url = f"https://jma.go.jp_{time_str}.jpg"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.content
+        target_time -= datetime.timedelta(minutes=10)
+    return None
+
 def main():
-    print("画像をダウンロード中...")
-    response = requests.get(URL)
-    if response.status_code != 200:
-        print(f"エラー: 画像の取得に失敗しました (Status: {response.status_code})")
+    image_bytes = download_latest_image()
+    if not image_bytes:
+        print("エラー: 有効な画像が見つかりませんでした。")
         return
 
-    # 画像を読み込み
-    img = Image.open(io.BytesIO(response.content))
+    img = Image.open(io.BytesIO(image_bytes))
     orig_w, orig_h = img.size
 
-    # 総画素数が4900pxになるように幅と高さを計算 (アスペクト比を維持)
-    aspect_ratio = orig_w / orig_h
-    new_h = math.sqrt(TARGET_TOTAL_PIXELS / aspect_ratio)
-    new_w = new_h * aspect_ratio
-
-    # 整数に丸める
-    new_w = round(new_w)
-    new_h = round(new_h)
-
+    # サイズ計算 (横56 x 縦42)
+    new_w = round(math.sqrt(TARGET_TOTAL_PIXELS / (orig_w / orig_h)) * (orig_w / orig_h))
+    new_h = round(math.sqrt(TARGET_TOTAL_PIXELS / (orig_w / orig_h)))
+    
     print(f"リサイズ後のサイズ: {new_w}x{new_h} px (合計: {new_w * new_h} px)")
-
-    # 画像を縮小、RGBモードに変換
+    
     resized_img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
     rgb_img = resized_img.convert("RGB")
 
-    # 各ピクセルをパレットの番号に変換
-    result_matrix = []
+    all_pixels_str = ""
     for y in range(new_h):
-        row_indices = []
         for x in range(new_w):
             pixel_rgb = rgb_img.getpixel((x, y))
-            # 一番近いパレットの「番目」を取得
             color_index = find_closest_color_index(pixel_rgb)
-            row_indices.append(str(color_index))
-        result_matrix.append("\n".join(row_indices))
+            if color_index == 10:
+                all_pixels_str += "0"
+            else:
+                all_pixels_str += str(color_index)
 
-    # 結果をテキストとしてまとめる（カンマと改行で区切る）
-    output_text = "\n".join(result_matrix)
+    # --- Scratch クラウド変数への送信処理 ---
+    print("Scratchへのログインを試みています...")
+    username = os.environ.get("SCRATCH_USERNAME")
+    password = os.environ.get("SCRATCH_PASSWORD")
+    
+    if not username or not password:
+        print("エラー: Scratchのログイン情報(Secrets)が設定されていません。")
+        return
 
-    # テキストファイルに保存
-    with open("result.txt", "w", encoding="utf-8") as f:
-        f.write(output_text)
+    try:
+        session = scratch.login(username, password)
+        conn = session.connect_cloud(project_id=SCRATCH_PROJECT_ID)
         
-    print(f"処理完了！結果を 'result.txt' に保存しました。")
+        # 2352文字を240文字ずつに分割（ちょうど10個の変数に収まります）
+        chunk_size = 240  
+        total_length = len(all_pixels_str)
+        
+        print(f"全 {total_length} 文字のデータを10分割して送信します...")
+        
+        var_count = 1
+        for i in range(0, total_length, chunk_size):
+            chunk = all_pixels_str[i:i+chunk_size]
+            var_name = f"cloud_data_{var_count}"  # ☁ cloud_data_1 〜 ☁ cloud_data_10
+            
+            print(f"Scratchの ☁ {var_name} にデータを送信中... ({len(chunk)}文字)")
+            conn.set_var(var_name, chunk)
+            
+            # 🛑 怒られないためのクールタイム（0.15秒待つ）
+            time.sleep(0.15)
+            var_count += 1
+            
+        print("🎉 すべてのクラウド変数（1〜10）への書き込みが安全に完了しました！")
+
+    except Exception as e:
+        print(f"Scratch連携エラー: {e}")
 
 if __name__ == "__main__":
     main()
