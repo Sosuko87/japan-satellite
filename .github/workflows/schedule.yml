@@ -1,0 +1,26 @@
+name: Run Python Script Every 10 Minutes
+
+on:
+  schedule:
+    # 10分おきに実行する設定（分 時 日 月 曜日）
+    - cron: '*/10 * * * *'
+  # 手動でテスト実行できるようにする設定（あると便利です）
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run script
+        env:
+          SCRATCH_PASSWORD: ${{ secrets.SCRATCH_PASSWORD }}
+          SCRATCH_USERNAME: ${{ secrets.SCRATCH_USERNAME }}
+        run: python main.py

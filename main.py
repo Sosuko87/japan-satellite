@@ -1,96 +1,128 @@
 import io
+import os
 import math
 import requests
 from PIL import Image
+import scratchattach as scratch66
+import time
+from datetime import datetime, timezone
 
-#URLの時間はテスト
-# ターゲット情報（総画素数を2倍の4900に設定）
-URL = "https://www.data.jma.go.jp/mscweb/data/himawari/img/jpn/jpn_trm_0020.jpg"
-TARGET_TOTAL_PIXELS = 9800
 
-# 指定された10色のパレット（1番目 〜 10番目）
+utc_now = datetime.now(timezone.utc)
+
+# 2. 「分」を10の倍数に切り捨てる計算
+# （例：23分 // 10 = 2  ->  2 * 10 = 20分）
+rounded_minute = (utc_now.minute // 10) * 10
+
+# 3. 分を置き換えて、秒とマイクロ秒を0にする
+new_utc = utc_now.replace(minute=rounded_minute, second=0, microsecond=0)
+use_utc = new_utc.strftime("%H%M")
+print(use_utc)
+# --- 設定情報 ---
+USERNAME = os.environ.get("SCRATCH_USERNAME")
+PASSWORD = os.environ.get("SCRATCH_PASSWORD")
+PROJECT_ID = "1380167146"
+
+URL = f"https://www.data.jma.go.jp/mscweb/data/himawari/img/jpn/jpn_trm_{use_utc}.jpg"
+print(f"画像URL: {URL}")
+TARGET_TOTAL_PIXELS = 2500
+
 COLOR_PALETTE = [
-    "#0A1128",  # 1番目　濃い青
-    "#102542",  # 2番目　ちょっと濃い青
-    "#1E3A5F",  # 3番目　青
-    "#878689",  # 4番目　青くも
-    "#566270",  # 5番目　超薄い青
-    "#CBD5E1",  # 6番目　白
-    "#2D4A22",  # 7番目　濃い緑
-    "#565E6A",  # 8番目　灰色青
-    "#4A5112",  # 9番目　茶色
-    "#57645C"   # 10番目　灰色
+    "#0A1128", "#102542", "#1E3A5F", "#102201", "#25390b",
+    "#aea8a8", "#2D4A22", "#384228", "#717871", "#d8d2d4"
 ]
 
 def hex_to_rgb(hex_str):
-    """カラーコード（#RRGGBB）をRGBの数値（0-255）に変換する関数"""
     hex_str = hex_str.lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
-# 事前にパレットの色をRGB数値に変換しておく
 PALETTE_RGB = [hex_to_rgb(c) for c in COLOR_PALETTE]
 
 def find_closest_color_index(target_rgb):
-    """一番近い色の「番目（1〜10）」を返す関数"""
     tr, tg, tb = target_rgb
     min_distance = float('inf')
-    closest_index = 1
+    closest_index = 0
     
-    # 10色すべてと距離を比べて、一番近いものを探す
     for idx, (pr, pg, pb) in enumerate(PALETTE_RGB):
-        # 3次元空間の色距離（ユークリッド距離）の計算
         distance = math.sqrt((tr - pr)**2 + (tg - pg)**2 + (tb - pb)**2)
         if distance < min_distance:
             min_distance = distance
-            closest_index = idx
+            closest_index = idx  # 0から9の数値を返す
             
     return closest_index
 
 def main():
+    print("Scratchにログイン中...")
+    try:
+        session = scratch66.login(USERNAME, PASSWORD)
+        connection = session.connect_cloud(PROJECT_ID)
+        print("Scratchへのログインとクラウド接続に成功しました！")
+    except Exception as e:
+        print(f"ログインエラー: {e}")
+        return
+
     print("画像をダウンロード中...")
     response = requests.get(URL)
     if response.status_code != 200:
-        print(f"エラー: 画像の取得に失敗しました (Status: {response.status_code})")
+        print(f"エラー: 画像の取得に失敗しました")
         return
 
-    # 画像を読み込み
     img = Image.open(io.BytesIO(response.content))
-    orig_w, orig_h = img.size
+    crop_box = (185, 51, 679, 489)
+    cropped_img = img.crop(crop_box)
+    crop_w, crop_h = cropped_img.size
 
-    # 総画素数が4900pxになるように幅と高さを計算 (アスペクト比を維持)
-    aspect_ratio = orig_w / orig_h
-    new_h = math.sqrt(TARGET_TOTAL_PIXELS / aspect_ratio)
-    new_w = new_h * aspect_ratio
+    aspect_ratio = crop_w / crop_h
+    new_h = round(math.sqrt(TARGET_TOTAL_PIXELS / aspect_ratio))
+    new_w = round(new_h * aspect_ratio)
 
-    # 整数に丸める
-    new_w = round(new_w)
-    new_h = round(new_h)
+    print(f"リサイズサイズ: {new_w}x{new_h} px")
 
-    print(f"リサイズ後のサイズ: {new_w}x{new_h} px (合計: {new_w * new_h} px)")
-
-    # 画像を縮小、RGBモードに変換
-    resized_img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    resized_img = cropped_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
     rgb_img = resized_img.convert("RGB")
 
-    # 各ピクセルをパレットの番号に変換
-    result_matrix = []
+    # 1. 数字だけを確実につなげる
+    all_pixels_chars = ""
     for y in range(new_h):
-        row_indices = []
         for x in range(new_w):
             pixel_rgb = rgb_img.getpixel((x, y))
-            # 一番近いパレットの「番目」を取得
             color_index = find_closest_color_index(pixel_rgb)
-            row_indices.append(str(color_index))
-        result_matrix.append("\n".join(row_indices))
+            # 確実に0〜9の1文字の文字列にする
+            all_pixels_chars += str(color_index)
 
-    # 結果をテキストとしてまとめる（カンマと改行で区切る）
-    output_text = "\n".join(result_matrix)
+    # 2. 10等分の処理
+    total_length = len(all_pixels_chars)
+    n = 10
+    chunk_size = total_length // n
+    remainder = total_length % n
 
-    # テキストファイルに保存
-    with open("result.txt", "w", encoding="utf-8") as f:
-        f.write(output_text)
+    cloud_data = {}
+    start = 0
+
+    for i in range(n):
+        end = start + chunk_size + (1 if i < remainder else 0)
+        var_name = f"cloud_data_{i+1}"
         
-    print(f"処理完了！結果を 'result.txt' に保存しました。")
+        # 切り出した文字列
+        chunk_value = all_pixels_chars[start:end]
+        
+        # 【超重要】念のため、空白や改行を完全に排除し、数字だけにするガード
+        chunk_value = "".join(c for c in chunk_value if c.isdigit())
+        
+        cloud_data[var_name] = chunk_value
+        start = end
+
+    # 3. Scratchのクラウド変数を自動更新
+    print("\nクラウド変数をまとめて更新中...")
+    try:
+        # 10個の変数をいっきにまとめてScratchに送信します
+        connection.set_vars(cloud_data)
+        print("すべてのクラウド変数の送信コマンドを完了しました！")
+    except Exception as e:
+        print(f"エラー: 更新に失敗しました。理由: {e}")
+        
+    print(f"\n処理完了！ブラウザのScratch画面を一度「再読み込み（リロード）」して確認してください。")
+
 
 if __name__ == "__main__":
     main()
