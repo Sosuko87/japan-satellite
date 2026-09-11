@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests scratchattach
+          pip install requests scratchattach Pillow
 
       - name: Run script
         env:
