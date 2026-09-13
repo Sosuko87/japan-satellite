@@ -2,6 +2,7 @@ name: 実行用
 
 on:
   repository_dispatch:
+    types: [my-cron-event] 
   workflow_dispatch:
 
 jobs:
