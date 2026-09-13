@@ -1,9 +1,9 @@
-name: Run Python Script Every 10 Minutes
+name: 実行用
 
 on:
   schedule:
     # 10分おきに実行する設定（分 時 日 月 曜日）
-    - cron: '*/13 * * * *'
+    - cron: '*/17 * * * *'
   # 手動でテスト実行できるようにする設定（あると便利です）
   workflow_dispatch:
 
