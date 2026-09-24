@@ -141,7 +141,7 @@ def main():
             
                 # 一度削除して、新しく追加（スタジオの先頭に上げる処理）
                 studio.remove_project(1350622697)
-               studio.add_project(1350622697)
+                studio.add_project(1350622697)
                 print(f"スタジオ {studio_id} の更新に成功しました。")
             
             except Exception as e:
