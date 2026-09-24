@@ -124,5 +124,16 @@ def main():
     print(f"\n処理完了！ブラウザのScratch画面を一度「再読み込み（リロード）」して確認してください。")
 
 
-if __name__ == "__main__":
-    main()
+main()
+
+#ここから他の処理に入る
+
+with open("studio.txt", "r", encoding="utf-8") as f:
+    for i, line in enumerate(f, start=1):
+        studio = session.connect_studio(i)
+        try:
+            studio.remove_project(1350622697)
+            studio.add_project(1350622697)
+        except Exception as e:
+            print(f"削除に失敗しました。IDが正しいか確認してください: {e}")
+        time.sleep(3)
