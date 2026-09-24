@@ -125,14 +125,29 @@ def main():
 
     #ここから他の処理に入る
     with open("studio.txt", "r", encoding="utf-8") as f:
-        for i, line in enumerate(f, start=1):
-            studio_id = str(strip(i))
-            studio = session.connect_studio(studio_id)
+        for raw_line in f:
+            # 強制的に文字列(str)に変換してから空白・改行を取り除く
+            studio_id = str(raw_line).strip()
+        
+        # 空行、または正しくないID（文字が含まれるなど）はスキップする
+            if not studio_id or not studio_id.isdigit():
+                continue
+            
+            print(f"スタジオ {studio_id} に接続中...")
+        
             try:
+                # 3. スタジオIDで接続する
+                studio = session.connect_studio(studio_id)
+            
+                # 一度削除して、新しく追加（スタジオの先頭に上げる処理）
                 studio.remove_project(1350622697)
-                studio.add_project(1350622697)
+               studio.add_project(1350622697)
+                print(f"スタジオ {studio_id} の更新に成功しました。")
+            
             except Exception as e:
-                print(f"削除に失敗しました。IDが正しいか確認してください: {e}")
+                print(f"スタジオ {studio_id} でエラーが発生しました: {e}")
+            
+        # Scratchの制限回避のため、3秒待つ
             time.sleep(3)
     
 
