@@ -126,7 +126,8 @@ def main():
     #ここから他の処理に入る
     with open("studio.txt", "r", encoding="utf-8") as f:
         for i, line in enumerate(f, start=1):
-            studio = session.connect_studio(line.strip(i))
+            studio_id = str(strip(i))
+            studio = session.connect_studio(studio_id)
             try:
                 studio.remove_project(1350622697)
                 studio.add_project(1350622697)
