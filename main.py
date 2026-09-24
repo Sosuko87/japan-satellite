@@ -3,7 +3,7 @@ import os
 import math
 import requests
 from PIL import Image
-import scratchattach as scratch66
+import scratchattach as sa
 import time
 from datetime import datetime, timezone
 
@@ -54,7 +54,7 @@ def find_closest_color_index(target_rgb):
 def main():
     print("Scratchにログイン中...")
     try:
-        session = scratch66.login(USERNAME, PASSWORD)
+        session = sa.login(USERNAME, PASSWORD)
         connection = session.connect_cloud(PROJECT_ID)
         print("Scratchへのログインとクラウド接続に成功しました！")
     except Exception as e:
@@ -123,12 +123,8 @@ def main():
         
     print(f"\n処理完了！ブラウザのScratch画面を一度「再読み込み（リロード）」して確認してください。")
 
-
-main()
-
-#ここから他の処理に入る
-
-with open("studio.txt", "r", encoding="utf-8") as f:
+    #ここから他の処理に入る
+    with open("studio.txt", "r", encoding="utf-8") as f:
     for i, line in enumerate(f, start=1):
         studio = session.connect_studio(i)
         try:
@@ -137,3 +133,10 @@ with open("studio.txt", "r", encoding="utf-8") as f:
         except Exception as e:
             print(f"削除に失敗しました。IDが正しいか確認してください: {e}")
         time.sleep(3)
+    
+
+main()
+
+
+
+
