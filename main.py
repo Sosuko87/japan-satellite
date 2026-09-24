@@ -148,7 +148,7 @@ def main():
                 print(f"スタジオ {studio_id} でエラーが発生しました: {e}")
             
         # Scratchの制限回避のため、3秒待つ
-            time.sleep(3)
+            time.sleep(5)
     
 
 main()
