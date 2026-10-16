@@ -7,7 +7,7 @@ import scratchattach as sa
 import time
 from datetime import datetime, timezone
 
-
+ad_project = 1386802849
 utc_now = datetime.now(timezone.utc)
 
 # 2. 「分」を10の倍数に切り捨てる計算
@@ -137,8 +137,8 @@ def main():
                 #studio = session.connect_studio(studio_id)
             
                 # 一度削除して、新しく追加（スタジオの先頭に上げる処理）
-                #studio.remove_project(1350622697)
-                #studio.add_project(1350622697)
+                #studio.remove_project(ad_project)
+                #studio.add_project(ad_project)
                 #print(f"スタジオ {studio_id} の更新に成功しました。")
             
             #except Exception as e:
