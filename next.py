@@ -14,7 +14,7 @@ cool_time=0
 now = datetime.datetime.now()
 
 if not 0 <= now.minute <= 13:
-    print(強制終了します)
+    print("強制終了します")
     sys.exit()
 
 with open("studio.txt", "r", encoding="utf-8") as f:
