@@ -1,5 +1,7 @@
 import scratchattach as sa
 ad_project = 1386802849
+USERNAME = os.environ.get("SCRATCH_USERNAME")
+PASSWORD = os.environ.get("SCRATCH_PASSWORD")
 with open("studio.txt", "r", encoding="utf-8") as f:
     for raw_line in f:
         studio_id = str(raw_line).strip()
