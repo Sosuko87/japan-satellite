@@ -8,6 +8,12 @@ ad_project = 1350622697
 USERNAME = os.environ.get("SCRATCH_USERNAME")
 PASSWORD = os.environ.get("SCRATCH_PASSWORD")
 session = sa.login(USERNAME, PASSWORD)
+cool_time=0
+
+now = datetime.datetime.now()
+
+if not 0 <= now.minute <= 13:
+    sys.exit()
 
 with open("studio.txt", "r", encoding="utf-8") as f:
     for raw_line in f:
