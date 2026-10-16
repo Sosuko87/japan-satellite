@@ -1,4 +1,5 @@
 import scratchattach as sa
+import os
 
 ad_project = 1386802849
 USERNAME = os.environ.get("SCRATCH_USERNAME")
