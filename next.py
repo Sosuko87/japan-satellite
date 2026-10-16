@@ -1,8 +1,10 @@
 import scratchattach as sa
 import os
 import time
+import sys
 
-ad_project = 1386802849
+#sys.exit()
+ad_project = 1350622697
 USERNAME = os.environ.get("SCRATCH_USERNAME")
 PASSWORD = os.environ.get("SCRATCH_PASSWORD")
 session = sa.login(USERNAME, PASSWORD)
