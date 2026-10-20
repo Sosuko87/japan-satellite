@@ -4,7 +4,7 @@ import time
 import datetime
 import sys
 
-#sys.exit()
+sys.exit()
 ad_project = 1350622697
 USERNAME = os.environ.get("SCRATCH_USERNAME")
 PASSWORD = os.environ.get("SCRATCH_PASSWORD")
