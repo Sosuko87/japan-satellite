@@ -4,9 +4,9 @@ import time
 import datetime
 import sys
 
-sys.exit()
-ad_project = 1350622697
-USERNAME = os.environ.get("SCRATCH_USERNAME")
+#sys.exit()
+ad_project = 1392601120
+USERNAME = '-TREND_FLOW-'
 PASSWORD = os.environ.get("SCRATCH_PASSWORD")
 session = sa.login(USERNAME, PASSWORD)
 cool_time=0
