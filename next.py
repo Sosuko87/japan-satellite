@@ -5,17 +5,18 @@ import datetime
 import sys
 
 #sys.exit()
+now = datetime.datetime.now()
+
+if not 15 <= now.minute <= 18:
+    print("強制終了します")
+    sys.exit()
+
 ad_project = 1392601120
 USERNAME = '-TREND_FLOW-'
 PASSWORD = os.environ.get("SCRATCH_PASSWORD")
 session = sa.login(USERNAME, PASSWORD)
 cool_time=0
 
-now = datetime.datetime.now()
-
-if not 0 <= now.minute <= 13:
-    print("強制終了します")
-    sys.exit()
 
 with open("studio.txt", "r", encoding="utf-8") as f:
     for raw_line in f:
