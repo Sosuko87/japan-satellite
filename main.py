@@ -1,66 +1,42 @@
-import os
-import time
+import json
 import zipfile
-import scratchattach as sa
 
-PASSWORD = os.environ.get("SCRATCH_PASSWORD")
-session = sa.login('Kahu-tositai', PASSWORD)
-project = session.connect_project("1442732643")
+def load_project_json(sb3_path):
+    with zipfile.ZipFile(sb3_path, "r") as z:
+        return json.loads(z.read("project.json").decode("utf-8"))
 
-failed_files = []
-oversized_files = []
+before = load_project_json("3DSplatoon.sb3")
+after = load_project_json("after.sb3")
 
-with zipfile.ZipFile("3DSplatoon.sb3", "r") as z:
-    asset_files = [
-        f for f in z.namelist()
-        if f != "project.json" and not f.endswith("/")
-    ]
-    total = len(asset_files)
-    print(f"全 {total} 個のアセットをアップロードします...")
+# 1. TurboWarp隠し設定 (_twconfig_) の比較
+def get_twconfig(data):
+    for t in data["targets"]:
+        for c in t.get("comments", {}).values():
+            if "_twconfig_" in c.get("text", ""):
+                return c["text"]
+    return "なし"
 
-    for i, filename in enumerate(asset_files, 1):
-        data = z.read(filename)
-        size_mb = len(data) / (1024 * 1024)
+print("--- 1. TurboWarp隠し設定 ---")
+print("アップロード前:", get_twconfig(before))
+print("アップロード後:", get_twconfig(after))
 
-        # 10MB制限チェック
-        if size_mb > 10:
-            print(f"[{i}/{total}] ⚠️ サイズ超過 ({size_mb:.1f}MB): {filename}")
-            oversized_files.append((filename, size_mb))
-            continue
+# 2. 定義ブロックの「画面を再描画せずに実行 (warp)」の数を確認
+def count_warp_blocks(data):
+    count = 0
+    for t in data["targets"]:
+        for b in t.get("blocks", {}).values():
+            if isinstance(b, dict) and b.get("opcode") == "procedures_prototype":
+                if str(b.get("mutation", {}).get("warp")).lower() == "true":
+                    count += 1
+    return count
 
-        asset_id, file_ext = filename.rsplit(".", 1)
+print("\n--- 2. 高速実行（画面を再描画せずに実行）ブロック数 ---")
+print("アップロード前:", count_warp_blocks(before), "個")
+print("アップロード後:", count_warp_blocks(after), "個")
 
-        # 最大3回までリトライしながら送信
-        success = False
-        for attempt in range(3):
-            try:
-                session.upload_asset(
-                    data,
-                    asset_id=asset_id,
-                    file_ext=file_ext.lower()
-                )
-                print(f"[{i}/{total}] OK: {filename}")
-                success = True
-                break
-            except Exception as e:
-                print(f"[{i}/{total}] 再試行中 ({attempt + 1}/3): {filename} ({e})")
-                time.sleep(1.5)
-
-        if not success:
-            failed_files.append(filename)
-
-        # サーバーに弾かれないよう少し待つ
-        time.sleep(0.25)
-
-print("\n--- 結果 ---")
-print(f"10MB超えで弾かれたファイル: {len(oversized_files)}個")
-for f, mb in oversized_files:
-    print(f"  - {f} ({mb:.1f}MB)")
-
-print(f"通信エラーで失敗したファイル: {len(failed_files)}個")
-for f in failed_files:
-    print(f"  - {f}")
-
-pb = sa.read_sb3_file("3DSplatoon.sb3")
-project.set_body(pb)
-print("完了！")
+# 3. 拡張機能リストの比較
+print("\n--- 3. 拡張機能情報 ---")
+print("アップロード前 extensions:", before.get("extensions"))
+print("アップロード後 extensions:", after.get("extensions"))
+print("アップロード前 extensionURLs:", before.get("extensionURLs"))
+print("アップロード後 extensionURLs:", after.get("extensionURLs"))
