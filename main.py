@@ -96,4 +96,30 @@ def regenerate_project_ids(project_data: dict) -> dict:
             target["blocks"] = new_blocks
 
         # comments がブロックに紐づいている場合の blockId を更新
-        for comment in target.get("comments", {}).values
+        for comment in target.get("comments", {}).values():
+            if isinstance(comment, dict) and comment.get("blockId") is not None:
+                comment["blockId"] = id_map.get(comment["blockId"], comment["blockId"])
+
+    # 4. ステージ上のモニター表示（変数・リスト表示枠）のIDを更新
+    for monitor in project_data.get("monitors", []):
+        if isinstance(monitor, dict) and "id" in monitor:
+            monitor["id"] = id_map.get(monitor["id"], monitor["id"])
+
+    return project_data
+
+
+# --- 実行例 ---
+if __name__ == "__main__":
+    input_path = Path("project.json")
+    output_path = Path("project_new_ids.json")
+
+    with input_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    updated_data = regenerate_project_ids(data)
+
+    with output_path.open("w", encoding="utf-8") as f:
+        # Scratchのproject.jsonはコンパクト出力（separators指定）にすると容量を抑えられる
+        json.dump(updated_data, f, ensure_ascii=False, separators=(",", ":"))
+
+    print(f"変換完了: {output_path}")
