@@ -1,75 +1,99 @@
 import json
 import random
+from pathlib import Path
 
 SOUP = "!#%()*+,-./:;=?@[]^_`{|}~ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
-def generate_scratch_id(length=20):
-    return ''.join(random.choices(SOUP, k=length))
 
-with open("project.json", "r", encoding="utf-8") as f:
-    data = json.load(f)
+class ScratchIDGenerator:
+    def __init__(self, existing_ids: set[str] | None = None):
+        # 元のIDとも新しいIDとも重複しないように管理
+        self.used_ids = set(existing_ids) if existing_ids else set()
 
-id_map = {}
-used_ids = set()
+    def generate(self, length: int = 20) -> str:
+        while True:
+            new_id = "".join(random.choices(SOUP, k=length))
+            if new_id not in self.used_ids:
+                self.used_ids.add(new_id)
+                return new_id
 
-def get_new_id(old_id):
-    if not old_id or not isinstance(old_id, str):
-        return old_id
-    if old_id not in id_map:
-        new_id = generate_scratch_id()
-        while new_id in used_ids:
-            new_id = generate_scratch_id()
-        used_ids.add(new_id)
-        id_map[old_id] = new_id
-    return id_map[old_id]
 
-# 1. まずターゲット内の定義（キー）を置換してマップを作成
-for target in data.get("targets", []):
-    for category in ["variables", "lists", "broadcasts", "blocks", "comments"]:
-        if category in target:
-            new_cat = {}
-            for old_id, val in target[category].items():
-                new_cat[get_new_id(old_id)] = val
-            target[category] = new_cat
+def replace_input_value(item, id_map: dict[str, str]):
+    """
+    blocks内のinputs配列を再帰的に走査し、ID参照のみを置換する。
+    リテラル値（数値・文字列など: 先頭要素が4〜10の配列）は誤置換を防ぐためそのまま残す。
+    """
+    if isinstance(item, str):
+        return id_map.get(item, item)
 
-# 2. 参照箇所（特定のキー・配列位置）だけをピンポイントで置換
-for target in data.get("targets", []):
-    # ブロック内の参照
-    for block_id, block in target.get("blocks", {}).items():
-        if not isinstance(block, dict):
-            continue
-        # parent, next, comment のIDを置換
-        for ref_key in ["parent", "next", "comment"]:
-            if block.get(ref_key) in id_map:
-                block[ref_key] = id_map[block[ref_key]]
-        
-        # inputs内のブロックID・変数ID・リストIDを置換
-        for inp_name, inp_val in block.get("inputs", {}).items():
-            if isinstance(inp_val, list):
-                for i in range(1, len(inp_val)):
-                    item = inp_val[i]
-                    if isinstance(item, str) and item in id_map:
-                        inp_val[i] = id_map[item]
-                    # 変数・リスト参照の配列 [12, "変数名", "変数ID"] や [13, "リスト名", "リストID"]
-                    elif isinstance(item, list) and len(item) >= 3 and item[0] in:
-                        if item[2] in id_map:
-                            item[2] = id_map[item[2]]
+    if isinstance(item, list) and len(item) > 0:
+        tag = item[0]
+        # [4〜10, "値"] は数値やテキストのリテラルなので置換しない
+        if isinstance(tag, int) and 4 <= tag <= 10:
+            return item
+        # [11, "メッセージ名", "broadcast_id"], [12, "変数名", "var_id"], [13, "リスト名", "list_id"]
+        if isinstance(tag, int) and tag in (11, 12, 13) and len(item) >= 3:
+            return [tag, item[1], id_map.get(item[2], item[2])] + item[3:]
+        # それ以外（[1, "block_id"], [2, "block_id"], [3, "block_id", shadow] など）
+        return [replace_input_value(elem, id_map) for elem in item]
 
-        # fields内の変数ID・リストID・メッセージIDを置換 ([ "名前", "ID" ] の形式)
-        for field_name, field_val in block.get("fields", {}).items():
-            if isinstance(field_val, list) and len(field_val) >= 2:
-                if field_val[1] in id_map:
-                    field_val[1] = id_map[field_val[1]]
+    return item
 
-    # コメント内の blockId 参照
-    for comment_id, comment in target.get("comments", {}).items():
-        if isinstance(comment, dict) and comment.get("blockId") in id_map:
-            comment["blockId"] = id_map[comment["blockId"]]
 
-# 3. ステージモニター（画面上の変数・リスト表示）のIDを置換
-for monitor in data.get("monitors", []):
-    if monitor.get("id") in id_map:
-        monitor["id"] = id_map[monitor["id"]]
+def regenerate_project_ids(project_data: dict) -> dict:
+    # 1. 全ターゲット（ステージ・スプライト）から既存の全IDを収集
+    old_ids: set[str] = set()
+    for target in project_data.get("targets", []):
+        for category in ("variables", "lists", "broadcasts", "blocks"):
+            old_ids.update(target.get(category, {}).keys())
 
-with open("project_new.json", "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+    # 2. 旧ID -> 新ID（20文字）の対応表を作成
+    id_gen = ScratchIDGenerator(existing_ids=old_ids)
+    id_map: dict[str, str] = {old_id: id_gen.generate(20) for old_id in old_ids}
+
+    # 3. 各ターゲット内の定義キーとブロック内参照を置換
+    for target in project_data.get("targets", []):
+        # variables / lists / broadcasts のキー置換
+        for category in ("variables", "lists", "broadcasts"):
+            if category in target:
+                target[category] = {
+                    id_map.get(k, k): v for k, v in target[category].items()
+                }
+
+        # blocks のキーおよび内部参照の置換
+        if "blocks" in target:
+            new_blocks = {}
+            for block_id, block_data in target["blocks"].items():
+                new_block_id = id_map.get(block_id, block_id)
+
+                # トップレベルに置かれた変数・リストのレポーターブロック（配列形式）の場合
+                if isinstance(block_data, list):
+                    new_blocks[new_block_id] = replace_input_value(block_data, id_map)
+                    continue
+
+                # 通常のブロック（辞書形式）
+                if block_data.get("next") is not None:
+                    block_data["next"] = id_map.get(block_data["next"], block_data["next"])
+
+                if block_data.get("parent") is not None:
+                    block_data["parent"] = id_map.get(block_data["parent"], block_data["parent"])
+
+                # inputs 内のブロックID・変数ID・リストID・ブロードキャストIDを置換
+                if "inputs" in block_data:
+                    block_data["inputs"] = {
+                        input_name: replace_input_value(input_val, id_map)
+                        for input_name, input_val in block_data["inputs"].items()
+                    }
+
+                # fields 内の ["名前", "ID"] の第2要素（ID）を置換
+                if "fields" in block_data:
+                    for field_name, field_val in block_data["fields"].items():
+                        if isinstance(field_val, list) and len(field_val) >= 2 and isinstance(field_val[1], str):
+                            field_val[1] = id_map.get(field_val[1], field_val[1])
+
+                new_blocks[new_block_id] = block_data
+
+            target["blocks"] = new_blocks
+
+        # comments がブロックに紐づいている場合の blockId を更新
+        for comment in target.get("comments", {}).values
